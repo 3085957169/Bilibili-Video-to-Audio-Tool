@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B站视频转换工具</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 50%, #ecfeff 100%);
+    color: #1e293b;
+    font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  .player-wrapper {
+    display: flex;
+    align-items: center;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+  }
+
+  .player {
+    width: 480px;
+    padding: 36px 40px;
+    background: #ffffff;
+    border-radius: 12px 0 0 12px;
+    border: 1px solid #e2e8f0;
+    border-right: none;
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #0f766e;
+    margin-bottom: 28px;
+    text-align: center;
+  }
+
+  .search-row {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f8fafc;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .search-row:focus-within {
+    border-color: #14b8a6;
+    box-shadow: 0 0 0 3px rgba(20,184,166,0.15);
+  }
+  .search-row input {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    font-size: 14px;
+    background: transparent;
+    color: #1e293b;
+    outline: none;
+  }
+  .search-row input::placeholder { color: #94a3b8; }
+  .search-row button {
+    padding: 12px 20px;
+    border: none;
+    background: #14b8a6;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: background 0.2s;
+  }
+  .search-row button:hover { background: #0d9488; }
+  .search-row button:disabled { background: #cbd5e1; color: #94a3b8; cursor: default; }
+
+  .results { max-height: 240px; overflow-y: auto; margin-bottom: 24px; }
+  .results::-webkit-scrollbar { width: 4px; }
+  .results::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+  .results::-webkit-scrollbar-track { background: transparent; }
+
+  .result-item {
+    padding: 10px 14px;
+    margin-bottom: 4px;
+    background: #f8fafc;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    border: 1px solid #f1f5f9;
+  }
+  .result-item:hover { background: #f0fdfa; border-color: #99f6e4; }
+  .result-item .idx {
+    font-size: 20px;
+    font-weight: 700;
+    color: #cbd5e1;
+    min-width: 28px;
+    text-align: center;
+    transition: color 0.2s;
+  }
+  .result-item:hover .idx { color: #14b8a6; }
+  .result-item .info { flex: 1; overflow: hidden; }
+  .result-item .tt {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+    color: #334155;
+  }
+  .result-item .sub {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 3px;
+  }
+  .result-item .sub .author-link {
+    color: #0d9488;
+    cursor: pointer;
+  }
+  .result-item .sub .author-link:hover {
+    text-decoration: underline;
+    color: #0f766e;
+  }
+  .result-item .play-btn {
+    color: #94a3b8;
+    font-size: 12px;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 50%;
+    transition: all 0.2s;
+    padding-left: 2px;
+  }
+  .result-item:hover .play-btn { border-color: #14b8a6; color: #14b8a6; background: #f0fdfa; }
+  .result-item .dl-btn {
+    color: #94a3b8;
+    font-size: 15px;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 50%;
+    transition: all 0.2s;
+    font-weight: 700;
+  }
+  .result-item:hover .dl-btn { border-color: #14b8a6; color: #14b8a6; background: #f0fdfa; }
+  .result-item.streaming .idx { color: #14b8a6; }
+  .result-item.streaming { background: #f0fdfa; border-color: #99f6e4; }
+  .cached-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    color: #059669;
+    background: #d1fae5;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .result-item.cached .dl-btn { color: #059669; border-color: #6ee7b7; }
+  .status-msg { text-align: center; padding: 30px 20px; color: #94a3b8; font-size: 13px; }
+  .load-more {
+    text-align: center;
+    padding: 12px;
+    color: #14b8a6;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1.5px dashed #99f6e4;
+    border-radius: 8px;
+    margin-top: 8px;
+    transition: all 0.2s;
+  }
+  .load-more:hover { background: #f0fdfa; border-color: #14b8a6; }
+
+  .dl-app-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 18px;
+    background: #1e293b;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .dl-app-btn:hover {
+    background: #0f172a;
+    color: #e2e8f0;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    transform: translateY(-1px);
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .song-list {
+    list-style: none;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 24px;
+  }
+  .song-list::-webkit-scrollbar { width: 4px; }
+  .song-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+  .song-list::-webkit-scrollbar-track { background: transparent; }
+
+  .song-list li {
+    padding: 10px 14px;
+    margin-bottom: 4px;
+    background: #f8fafc;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid #f1f5f9;
+    border-left: 3px solid transparent;
+  }
+  .song-list li:hover { background: #f0fdfa; border-color: #99f6e4; }
+  .song-list li.active { background: #f0fdfa; border-color: #14b8a6; border-left-color: #14b8a6; }
+  .song-list li .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #cbd5e1;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .song-list li.active .dot { background: #14b8a6; }
+  .song-list li .name { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #334155; }
+  .song-list li .sub-name { font-size: 11px; color: #94a3b8; margin-left: 8px; flex-shrink: 0; }
+  .song-list li .del {
+    color: #cbd5e1;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .song-list li .del:hover { color: #ef4444; }
+  .song-list li .dl-local {
+    color: #cbd5e1;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+  .song-list li .dl-local:hover { color: #14b8a6; }
+
+  .now-playing {
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+  }
+  .now-playing h3 {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    text-align: center;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status-bar { display: flex; align-items: center; gap: 10px; }
+  .status-bar audio { flex: 1; min-width: 0; }
+
+  audio {
+    height: 32px;
+  }
+  audio::-webkit-media-controls-panel { background: #f1f5f9; }
+  audio::-webkit-media-controls-current-time-display,
+  audio::-webkit-media-controls-time-remaining-display { color: #334155; }
+
+  /* ---- side panel ---- */
+  .side-panel {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .panel-tab {
+    width: 28px;
+    padding: 12px 0;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 12px;
+    transition: all 0.2s;
+    writing-mode: vertical-rl;
+    letter-spacing: 2px;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .panel-tab:hover { color: #14b8a6; background: #f0fdfa; }
+
+  .panel-content {
+    position: absolute;
+    left: 28px;
+    top: 0;
+    width: 0;
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-left: none;
+    border-radius: 0 12px 12px 0;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease,
+                padding 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    opacity: 0;
+    padding: 20px 0;
+  }
+
+  .side-panel:hover .panel-content {
+    width: 240px;
+    opacity: 1;
+    padding: 20px 18px;
+  }
+
+  .panel-content .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  .panel-content input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #1e293b;
+    background: #f8fafc;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .panel-content input:focus { border-color: #14b8a6; }
+  .panel-content input::placeholder { color: #cbd5e1; }
+
+  .panel-content .btn-sm {
+    padding: 6px 0;
+    border: 1.5px solid #14b8a6;
+    border-radius: 6px;
+    background: #14b8a6;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    width: 100%;
+    text-align: center;
+  }
+  .panel-content .btn-sm:hover { background: #0d9488; border-color: #0d9488; }
+
+  .panel-content .mode-btn {
+    padding: 6px 0;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 6px;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    width: 100%;
+    text-align: center;
+  }
+  .panel-content .mode-btn:hover { border-color: #14b8a6; color: #14b8a6; background: #f0fdfa; }
+  .panel-content .mode-btn.on { border-color: #14b8a6; background: #14b8a6; color: #fff; }
+</style>
+</head>
+<body>
+<div class="player-wrapper">
+  <div class="player">
+    <div class="logo">B站视频转换工具</div>
+
+    <div class="search-row">
+      <input id="searchInput" type="text" placeholder="搜索关键词 / 粘贴BV号或B站链接..." autocomplete="off">
+      <button id="searchBtn" onclick="doSearch()">Search</button>
+    </div>
+    <div class="results" id="results"></div>
+
+    <div class="section-label">播放历史</div>
+    <ul class="song-list" id="list"></ul>
+
+    <div class="now-playing">
+      <h3 id="title">Select a song</h3>
+      <div class="status-bar">
+        <audio id="audio" controls></audio>
+      </div>
+    </div>
+  </div>
+
+  <!-- side panel -->
+  <div class="side-panel" id="sidePanel">
+    <div class="panel-tab">设 置</div>
+    <div class="panel-content">
+      <div>
+        <div class="section-title">播放模式</div>
+        <button class="mode-btn on" id="btnSeq" onclick="setMode('seq')" style="margin-top:4px;">顺序播放</button>
+        <button class="mode-btn" id="btnOne" onclick="setMode('one')" style="margin-top:4px;">单曲循环</button>
+        <button class="mode-btn" id="btnShuf" onclick="setMode('shuf')" style="margin-top:4px;">随机播放</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<a href="/api/app" class="dl-app-btn" title="下载服务端文件到本机运行">&#8691; 下载</a>
+
+<script>
+  const audio = document.getElementById("audio");
+  const titleEl = document.getElementById("title");
+  const list = document.getElementById("list");
+  const results = document.getElementById("results");
+  const searchInput = document.getElementById("searchInput");
+  const searchBtn = document.getElementById("searchBtn");
+
+  audio.volume = 0.8;
+
+  let mode = "seq";
+  let history = [];
+  let currentIdx = -1;
+  let shuffleIdx = -1;
+  let shuffleOrder = [];
+
+  const HISTORY_KEY = "play_history";
+  const MAX_HISTORY = 50;
+
+  function saveHistory() {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  }
+
+  function loadHistory() {
+    try {
+      history = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    } catch (e) {
+      history = [];
+    }
+    list.innerHTML = "";
+    history.forEach((h, i) => {
+      list.appendChild(renderHistoryLi(h, i));
+    });
+  }
+
+  function addToHistory(bvid, title, author, duration) {
+    history = history.filter(h => h.bvid !== bvid);
+    history.unshift({ bvid, title, author, duration, time: Date.now() });
+    if (history.length > MAX_HISTORY) history.pop();
+    saveHistory();
+    loadHistory();
+  }
+
+  function setMode(m) {
+    mode = m;
+    document.getElementById("btnSeq").className = m === "seq" ? "mode-btn on" : "mode-btn";
+    document.getElementById("btnOne").className = m === "one" ? "mode-btn on" : "mode-btn";
+    document.getElementById("btnShuf").className = m === "shuf" ? "mode-btn on" : "mode-btn";
+    if (m === "shuf") buildShuffle();
+  }
+
+  function buildShuffle() {
+    shuffleOrder = [...Array(history.length).keys()];
+    for (let i = shuffleOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffleOrder[i], shuffleOrder[j]] = [shuffleOrder[j], shuffleOrder[i]];
+    }
+    if (shuffleOrder.length > 1 && shuffleOrder[0] === currentIdx) {
+      [shuffleOrder[0], shuffleOrder[1]] = [shuffleOrder[1], shuffleOrder[0]];
+    }
+    shuffleIdx = 0;
+  }
+
+  function playIndex(idx) {
+    if (idx < 0 || idx >= history.length) return;
+    currentIdx = idx;
+    const h = history[idx];
+    currentBvid = h.bvid;
+    document.querySelectorAll("#list li").forEach((el, i) => {
+      el.classList.toggle("active", i === idx);
+    });
+    titleEl.textContent = h.title;
+    audio.src = "/api/stream?bvid=" + h.bvid;
+    audio.play();
+  }
+
+  function playNext() {
+    if (!history.length) return;
+    if (mode === "one") { audio.currentTime = 0; audio.play(); return; }
+    if (mode === "shuf") {
+      if (shuffleIdx >= shuffleOrder.length) buildShuffle();
+      playIndex(shuffleOrder[shuffleIdx++]);
+      return;
+    }
+    playIndex((currentIdx + 1) % history.length);
+  }
+
+  audio.addEventListener("ended", playNext);
+
+  function renderHistoryLi(h, i) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="dot"></span><span class="name">${h.title}</span><span class="sub-name">${h.author}</span><span class="dl-local" title="Download">&#8595;</span><span class="del" title="Remove">x</span>`;
+    li.onclick = (e) => {
+      if (e.target.classList.contains("dl-local")) {
+        e.stopPropagation();
+        downloadHistoryItem(h, e.target);
+        return;
+      }
+      if (e.target.classList.contains("del")) {
+        e.stopPropagation();
+        history.splice(i, 1);
+        if (currentIdx === i) currentIdx = -1;
+        else if (currentIdx > i) currentIdx--;
+        saveHistory();
+        loadHistory();
+        return;
+      }
+      playIndex(i);
+      if (mode === "shuf") buildShuffle();
+    };
+    return li;
+  }
+
+  function downloadHistoryItem(h, el) {
+    el.textContent = "...";
+    el.style.pointerEvents = "none";
+    fetch("/api/download", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({bvid: h.bvid, title: h.title}) })
+      .then(r => r.json()).then(data => {
+        if (data.ok) {
+          el.textContent = "done";
+          el.style.background = "#1a3a2a";
+          setTimeout(() => { el.textContent = "↓"; el.style.background = ""; el.style.pointerEvents = "auto"; }, 2000);
+          downloadFile(data.song);
+        } else {
+          el.textContent = "!";
+          el.style.pointerEvents = "auto";
+          alert("Download failed: " + data.error);
+        }
+      })
+      .catch(e => { el.textContent = "!"; el.style.pointerEvents = "auto"; alert("Error: " + e.message); });
+  }
+
+  let searchQuery = "";
+  let searchPage = 1;
+  let searchIsBvid = false;
+
+  function renderResults(data, append) {
+    const html = data.map((v, i) =>
+      `<div class="result-item${v.cached ? ' cached' : ''}" data-bvid="${v.bvid}" data-title="${v.title.replace(/"/g, '&quot;')}" data-author="${v.author}" data-duration="${v.duration}">
+        <span class="idx">${append ? (searchPage - 1) * 10 + i + 1 : i + 1}</span>
+        <span class="info" onclick="stream(this.closest('.result-item'))">
+          <div class="tt">${v.cached ? '<span class="cached-tag">已缓存</span> ' : ''}${v.title}</div>
+          <div class="sub"><span class="author-link" onclick="searchAuthor('${v.author.replace(/'/g, "\\'")}'); event.stopPropagation();">${v.author}</span>  ·  ${fmtPlay(v.play)} plays  ·  ${v.duration}</div>
+        </span>
+        <span class="play-btn" onclick="stream(this.closest('.result-item'))" title="Play">&#9654;</span>
+        <span class="dl-btn" onclick="download('${v.bvid}','${v.title.replace(/'/g, "\\'")}',this)" title="Download">+</span>
+      </div>`
+    ).join("");
+    if (append) {
+      results.insertAdjacentHTML("beforeend", html);
+    } else {
+      results.innerHTML = html;
+    }
+  }
+
+  function doSearch(page) {
+    const q = searchInput.value.trim();
+    if (!q) return;
+    if (!page) {
+      page = 1;
+      searchQuery = q;
+      searchPage = 1;
+      searchIsBvid = false;
+      results.innerHTML = '<div class="status-msg">Searching...</div>';
+    } else {
+      searchPage = page;
+    }
+    searchBtn.disabled = true;
+
+    const bvMatch = q.match(/(?:bilibili\.com\/video\/|b23\.tv\/|^)(BV[A-Za-z0-9]{10,})/);
+    searchIsBvid = !!bvMatch;
+    const url = bvMatch ? "/api/info?bvid=" + bvMatch[1] : "/api/search?q=" + encodeURIComponent(q) + "&page=" + page;
+
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { results.innerHTML = `<div class="status-msg">${data.error}</div>`; searchBtn.disabled = false; return; }
+        if (!data.results.length) {
+          if (!page || page === 1) results.innerHTML = '<div class="status-msg">No results</div>';
+          searchBtn.disabled = false;
+          return;
+        }
+        renderResults(data.results, page > 1);
+        const total = data.total || 0;
+        const shown = page * 10;
+        if (total > shown && !searchIsBvid) {
+          const btn = document.createElement("div");
+          btn.className = "load-more";
+          btn.textContent = `加载更多 (${shown}/${total})`;
+          btn.onclick = () => { btn.remove(); doSearch(searchPage + 1); };
+          results.appendChild(btn);
+        }
+        searchBtn.disabled = false;
+      })
+      .catch(e => { results.innerHTML = `<div class="status-msg">Error: ${e.message}</div>`; searchBtn.disabled = false; });
+  }
+
+  let currentBvid = null;
+
+  function stream(el) {
+    const bvid = el.dataset.bvid;
+    const title = el.dataset.title;
+    const author = el.dataset.author;
+    const duration = el.dataset.duration;
+
+    if (currentBvid === bvid) {
+      if (audio.paused) audio.play();
+      return;
+    }
+
+    currentBvid = bvid;
+    el.classList.add("streaming");
+    titleEl.textContent = title;
+    audio.src = "/api/stream?bvid=" + bvid;
+    audio.play();
+    document.querySelectorAll("#list li").forEach(li => li.classList.remove("active"));
+    currentIdx = -1;
+    addToHistory(bvid, title, author, duration);
+  }
+
+  function searchAuthor(name) {
+    searchInput.value = name;
+    doSearch();
+  }
+
+  function download(bvid, title, el) {
+    el.textContent = "...";
+    el.style.pointerEvents = "none";
+    fetch("/api/download", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({bvid, title}) })
+      .then(r => r.json()).then(data => {
+        if (data.ok) {
+          el.textContent = "done";
+          el.style.background = "#1a3a2a";
+          downloadFile(data.song);
+        }
+        else { el.textContent = "!"; el.style.pointerEvents = "auto"; alert("Download failed: " + data.error); }
+      })
+      .catch(e => { el.textContent = "!"; el.style.pointerEvents = "auto"; alert("Error: " + e.message); });
+  }
+
+  function downloadFile(s) {
+    const a = document.createElement("a");
+    a.href = s.src;
+    a.download = s.file;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  function fmtPlay(n) {
+    if (n >= 10000) return (n/10000).toFixed(1) + "万";
+    if (n >= 1000) return (n/1000).toFixed(1) + "k";
+    return n;
+  }
+
+  searchInput.addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); });
+  loadHistory();
+</script>
+</body>
+</html>
